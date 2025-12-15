@@ -169,6 +169,9 @@ func (c *duneClient) QueryExecute(queryID int, queryParameters map[string]any) (
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(jsonData)), nil }
 	resp, err := httpRequest(c.env.APIKey, req)
 	if err != nil {
 		return nil, err
@@ -197,7 +200,9 @@ func (c *duneClient) SQLExecute(sql string, performance string) (*models.Execute
 	if err != nil {
 		return nil, err
 	}
-	
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(jsonData)), nil }
 	resp, err := httpRequest(c.env.APIKey, req)
 	if err != nil {
 		return nil, err
@@ -225,6 +230,9 @@ func (c *duneClient) QueryPipelineExecute(queryID string, performance string) (*
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(jsonData)), nil }
 
 	resp, err := httpRequest(c.env.APIKey, req)
 	if err != nil {
@@ -382,6 +390,9 @@ func (c *duneClient) getUsage(startDate, endDate *string) (*models.UsageResponse
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(jsonData)), nil }
 	
 	resp, err := httpRequest(c.env.APIKey, req)
 	if err != nil {

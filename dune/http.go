@@ -83,6 +83,15 @@ func httpRequest(apiKey string, req *http.Request) (*http.Response, error) {
 	p := defaultRetryPolicy
 	attempt := 1
 	for {
+		if attempt > 1 && req.Body != nil {
+			if req.GetBody != nil {
+				b, err := req.GetBody()
+				if err != nil {
+					return nil, fmt.Errorf("failed to reset request body: %w", err)
+				}
+				req.Body = b
+			}
+		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			if attempt >= p.MaxAttempts {
@@ -97,64 +106,38 @@ func httpRequest(apiKey string, req *http.Request) (*http.Response, error) {
 			return resp, nil
 		}
 
-		defer resp.Body.Close()
 		snippetBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		_ = resp.Body.Close()
 		var errorResp ErrorResponse
+		msg := string(snippetBytes)
 		if err := json.Unmarshal(snippetBytes, &errorResp); err == nil && errorResp.Error != "" {
-			msg := errorResp.Error
-			rl := parseRateLimitHeaders(resp.Header)
-			retryAfter := time.Duration(0)
-			if ra := resp.Header.Get("Retry-After"); ra != "" {
-				if secs, err := strconv.Atoi(ra); err == nil {
-					retryAfter = time.Duration(secs) * time.Second
-				}
-			}
-			apiErr := &APIError{StatusCode: resp.StatusCode, StatusText: resp.Status, BodySnippet: msg, RateLimit: rl, RetryAfter: retryAfter}
-			retryable := false
-			for _, code := range p.RetryableStatusCodes {
-				if resp.StatusCode == code {
-					retryable = true
-					break
-				}
-			}
-			if retryable && attempt < p.MaxAttempts {
-				sleep := p.NextBackoff(attempt)
-				if apiErr.RetryAfter > 0 && apiErr.RetryAfter > sleep {
-					sleep = apiErr.RetryAfter
-				}
-				time.Sleep(sleep)
-				attempt++
-				continue
-			}
-			return nil, fmt.Errorf("%w: %v", ErrorReqUnsuccessful, apiErr)
-		} else {
-			msg := string(snippetBytes)
-			rl := parseRateLimitHeaders(resp.Header)
-			retryAfter := time.Duration(0)
-			if ra := resp.Header.Get("Retry-After"); ra != "" {
-				if secs, err := strconv.Atoi(ra); err == nil {
-					retryAfter = time.Duration(secs) * time.Second
-				}
-			}
-			apiErr := &APIError{StatusCode: resp.StatusCode, StatusText: resp.Status, BodySnippet: msg, RateLimit: rl, RetryAfter: retryAfter}
-			retryable := false
-			for _, code := range p.RetryableStatusCodes {
-				if resp.StatusCode == code {
-					retryable = true
-					break
-				}
-			}
-			if retryable && attempt < p.MaxAttempts {
-				sleep := p.NextBackoff(attempt)
-				if apiErr.RetryAfter > 0 && apiErr.RetryAfter > sleep {
-					sleep = apiErr.RetryAfter
-				}
-				time.Sleep(sleep)
-				attempt++
-				continue
-			}
-			return nil, fmt.Errorf("%w: %v", ErrorReqUnsuccessful, apiErr)
+			msg = errorResp.Error
 		}
+		rl := parseRateLimitHeaders(resp.Header)
+		retryAfter := time.Duration(0)
+		if ra := resp.Header.Get("Retry-After"); ra != "" {
+			if secs, err := strconv.Atoi(ra); err == nil {
+				retryAfter = time.Duration(secs) * time.Second
+			}
+		}
+		apiErr := &APIError{StatusCode: resp.StatusCode, StatusText: resp.Status, BodySnippet: msg, RateLimit: rl, RetryAfter: retryAfter}
+		retryable := false
+		for _, code := range p.RetryableStatusCodes {
+			if resp.StatusCode == code {
+				retryable = true
+				break
+			}
+		}
+		if retryable && attempt < p.MaxAttempts {
+			sleep := p.NextBackoff(attempt)
+			if apiErr.RetryAfter > 0 && apiErr.RetryAfter > sleep {
+				sleep = apiErr.RetryAfter
+			}
+			time.Sleep(sleep)
+			attempt++
+			continue
+		}
+		return nil, fmt.Errorf("%w: %v", ErrorReqUnsuccessful, apiErr)
 		rl := parseRateLimitHeaders(resp.Header)
 		retryAfter := time.Duration(0)
 		if ra := resp.Header.Get("Retry-After"); ra != "" {
