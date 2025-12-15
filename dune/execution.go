@@ -3,6 +3,7 @@ package dune
 import (
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/duneanalytics/duneapi-client-go/models"
@@ -77,7 +78,8 @@ func (e *execution) WaitGetResults(pollInterval time.Duration, maxRetries int) (
 			if maxRetries != 0 && errAttempts >= maxRetries {
 				return nil, fmt.Errorf("%w. %s", ErrorRetriesExhausted, err.Error())
 			}
-			sleep := nextBackoff(errAttempts, defaultRetryPolicy)
+			fmt.Fprintln(os.Stderr, "failed to retrieve results. Retrying...\n", err)
+			sleep := defaultRetryPolicy.NextBackoff(errAttempts)
 			time.Sleep(sleep)
 			continue
 		}
